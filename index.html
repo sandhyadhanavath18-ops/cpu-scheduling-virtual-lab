@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>CPU Scheduling Lab</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17233b;
+      --muted: #64728a;
+      --line: #e1e7f0;
+      --paper: #ffffff;
+      --wash: #f5f7fb;
+      --blue: #4263eb;
+      --blue-dark: #304cc4;
+      --teal: #0e9f8a;
+      --amber: #d68511;
+      --red: #d04a57;
+      --shadow: 0 12px 35px rgba(34, 52, 88, .07);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--wash);
+      color: var(--ink);
+      font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+
+    .page { width: min(1180px, calc(100% - 36px)); margin: 0 auto; }
+    .hero {
+      padding: 46px 0 30px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+    .eyebrow::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--teal); }
+    h1 { margin: 0; font-size: clamp(32px, 5vw, 48px); line-height: 1.08; letter-spacing: -.045em; }
+    .hero p { max-width: 630px; margin: 14px 0 0; color: var(--muted); font-size: 16px; }
+    .offline-badge {
+      flex: 0 0 auto;
+      padding: 9px 13px;
+      border: 1px solid #d5e9e4;
+      border-radius: 999px;
+      background: #f0faf7;
+      color: #167c6c;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    main { padding-bottom: 56px; }
+    .card {
+      margin-bottom: 20px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+    .section-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .section-heading h2 { margin: 0; font-size: 19px; letter-spacing: -.02em; }
+    .section-heading p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .section-number {
+      display: grid;
+      width: 32px;
+      height: 32px;
+      flex: 0 0 auto;
+      place-items: center;
+      border-radius: 10px;
+      background: #eef1ff;
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .heading-copy { display: flex; gap: 12px; }
+
+    .input-grid {
+      display: grid;
+      grid-template-columns: minmax(140px, 1.2fr) minmax(130px, 1fr) minmax(130px, 1fr) auto;
+      align-items: end;
+      gap: 12px;
+    }
+    label { display: block; color: #46546b; font-size: 12px; font-weight: 750; }
+    input, select {
+      width: 100%;
+      height: 42px;
+      margin-top: 6px;
+      padding: 0 11px;
+      border: 1px solid #d8dfeb;
+      border-radius: 9px;
+      outline: none;
+      background: #fff;
+      color: var(--ink);
+    }
+    input:focus, select:focus { border-color: #8398fa; box-shadow: 0 0 0 3px rgba(66, 99, 235, .12); }
+    .button {
+      min-height: 42px;
+      padding: 0 15px;
+      border: 1px solid transparent;
+      border-radius: 9px;
+      background: var(--blue);
+      color: white;
+      font-weight: 750;
+      transition: background .16s ease, transform .16s ease;
+    }
+    .button:hover { background: var(--blue-dark); }
+    .button:active { transform: translateY(1px); }
+    .button.secondary { border-color: #d9e0ee; background: white; color: #35435c; }
+    .button.secondary:hover { background: #f7f8fc; }
+    .button.small { min-height: 36px; padding: 0 12px; font-size: 13px; }
+    .button:disabled { cursor: not-allowed; opacity: .48; }
+
+    .table-wrap { overflow-x: auto; margin-top: 22px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { padding: 10px 12px; border-bottom: 1px solid var(--line); color: #77849a; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; }
+    td { padding: 11px 12px; border-bottom: 1px solid #edf0f5; font-variant-numeric: tabular-nums; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .process-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+    }
+    .swatch { width: 10px; height: 10px; border-radius: 3px; background: var(--process-color); }
+    .remove-button {
+      border: 0;
+      background: transparent;
+      color: #8a96a9;
+      font-size: 19px;
+      line-height: 1;
+    }
+    .remove-button:hover { color: var(--red); }
+    .empty-state { padding: 24px 12px; color: #7a879b; text-align: center; }
+    .table-foot {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .run-grid {
+      display: grid;
+      grid-template-columns: minmax(180px, 1.2fr) minmax(140px, .7fr) minmax(160px, .85fr) auto;
+      align-items: end;
+      gap: 12px;
+    }
+    .quantum-field.hidden { display: none; }
+    .error-message { min-height: 20px; margin: 10px 0 0; color: var(--red); font-size: 13px; }
+
+    .result-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(270px, .85fr); gap: 20px; }
+    .subpanel {
+      min-width: 0;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: #fff;
+    }
+    .subpanel h3 { margin: 0 0 3px; font-size: 15px; }
+    .subpanel .hint { margin: 0 0 15px; color: var(--muted); font-size: 12px; }
+    .chart-scroll { overflow-x: auto; padding: 6px 0 2px; }
+    .chart { display: flex; min-width: 100%; width: max-content; }
+    .chart-segment {
+      position: relative;
+      display: flex;
+      min-width: 62px;
+      height: 64px;
+      align-items: center;
+      justify-content: center;
+      border-right: 2px solid white;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 850;
+      cursor: pointer;
+      transition: opacity .16s ease, transform .16s ease, box-shadow .16s ease;
+    }
+    .chart-segment.idle { background: #c8d0dd; color: #46546b; }
+    .chart-segment:hover { transform: translateY(-2px); }
+    .chart-segment.active { z-index: 1; box-shadow: 0 0 0 3px #f4c95d, 0 5px 16px rgba(37, 49, 77, .2); }
+    .chart-segment.dimmed { opacity: .38; }
+    .tick-row { position: relative; height: 24px; color: #748198; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .tick { position: absolute; top: 5px; transform: translateX(-50%); }
+    .tick:first-child { transform: none; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 12px; }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; color: #627087; font-size: 11px; }
+    .legend-item .swatch { width: 8px; height: 8px; }
+    .chart-empty { display: grid; min-height: 124px; place-items: center; border: 1px dashed #d9e0eb; border-radius: 10px; color: #8290a4; text-align: center; }
+
+    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 14px; }
+    .metric { padding: 11px; border-radius: 10px; background: #f5f7fb; }
+    .metric span { display: block; color: var(--muted); font-size: 11px; }
+    .metric strong { display: block; margin-top: 2px; font-size: 19px; font-variant-numeric: tabular-nums; }
+    .step-controls { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+    .step-controls .step-label { margin-left: auto; color: var(--muted); font-size: 11px; }
+    .metrics-table th, .metrics-table td { padding: 8px 9px; }
+    .metrics-table th { font-size: 10px; }
+    .metrics-table td { font-size: 12px; }
+    .metrics-table .selected-row { background: #fff8df; }
+
+    .log-list { display: grid; gap: 9px; max-height: 300px; overflow-y: auto; padding: 2px 3px 2px 0; }
+    .log-entry { display: grid; grid-template-columns: 25px 1fr; gap: 9px; align-items: start; color: #4f5c72; font-size: 12px; }
+    .log-dot { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 8px; background: #eff2f8; color: #58667c; font-size: 10px; font-weight: 850; }
+    .log-entry.active .log-dot { background: #fff1c1; color: #8a5a00; }
+    .log-entry.active { color: #24314a; }
+    .log-time { display: block; margin-bottom: 1px; color: #8a96a9; font-size: 10px; font-variant-numeric: tabular-nums; }
+    .log-empty { color: #8491a4; font-size: 13px; }
+
+    .lab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .lab-item { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+    .lab-item h3 { margin: 0 0 7px; font-size: 14px; }
+    .lab-item p { margin: 0; color: #5d6a80; font-size: 13px; }
+    pre {
+      overflow-x: auto;
+      margin: 9px 0 0;
+      padding: 13px;
+      border-radius: 9px;
+      background: #17233b;
+      color: #e5ecff;
+      font: 12px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace;
+      tab-size: 2;
+    }
+    details { border-top: 1px solid #edf0f5; padding: 12px 0; }
+    details:first-of-type { border-top: 0; padding-top: 0; }
+    summary { cursor: pointer; color: #35435c; font-size: 13px; font-weight: 750; }
+    details p { margin: 7px 0 0; color: var(--muted); font-size: 13px; }
+    footer { padding: 0 0 30px; color: #8792a4; font-size: 12px; text-align: center; }
+
+    @media (max-width: 760px) {
+      .hero { align-items: flex-start; flex-direction: column; padding-top: 32px; }
+      .offline-badge { margin-top: -7px; }
+      .input-grid { grid-template-columns: 1fr 1fr; }
+      .input-grid .button { grid-column: span 2; }
+      .run-grid { grid-template-columns: 1fr 1fr; }
+      .run-grid > .button { grid-column: span 2; }
+      .result-grid, .lab-grid { grid-template-columns: 1fr; }
+      .card { padding: 18px; }
+    }
+    @media (max-width: 440px) {
+      .page { width: min(100% - 22px, 1180px); }
+      .input-grid, .run-grid { grid-template-columns: 1fr; }
+      .input-grid .button, .run-grid > .button { grid-column: auto; }
+      .section-heading { align-items: flex-start; }
+      .table-foot { flex-direction: column; gap: 3px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div>
+        <div class="eyebrow">Operating systems · interactive lab</div>
+        <h1>CPU Scheduling<br>Simulator</h1>
+        <p>Explore how the scheduler chooses the next process. Add workloads, compare algorithms, and follow every CPU time slice on a live Gantt chart.</p>
+      </div>
+      <div class="offline-badge">● Works offline · no libraries</div>
+    </header>
+
+    <main>
+      <section class="card" aria-labelledby="process-title">
+        <div class="section-heading">
+          <div class="heading-copy">
+            <span class="section-number">01</span>
+            <div>
+              <h2 id="process-title">Build your process queue</h2>
+              <p>Enter a process ID, arrival time, and CPU burst length.</p>
+            </div>
+          </div>
+          <button class="button secondary small" id="sample-button" type="button">Load sample</button>
+        </div>
+        <form class="input-grid" id="process-form">
+          <label>Process ID
+            <input id="process-id" type="text" maxlength="12" placeholder="P1" autocomplete="off" required>
+          </label>
+          <label>Arrival time
+            <input id="arrival-time" type="number" min="0" step="1" value="0" required>
+          </label>
+          <label>Burst time
+            <input id="burst-time" type="number" min="1" step="1" placeholder="e.g. 5" required>
+          </label>
+          <button class="button" type="submit">＋ Add process</button>
+        </form>
+
+        <div class="table-wrap">
+          <table aria-label="Input processes">
+            <thead>
+              <tr><th>Process</th><th>Arrival time</th><th>Burst time</th><th aria-label="Actions"></th></tr>
+            </thead>
+            <tbody id="process-body"></tbody>
+          </table>
+          <div class="empty-state" id="process-empty">No processes yet. Add one above or load the sample workload.</div>
+        </div>
+        <div class="table-foot">
+          <span id="process-count">0 processes</span>
+          <button class="button secondary small" id="clear-button" type="button">Clear all</button>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="algorithm-title">
+        <div class="section-heading">
+          <div class="heading-copy">
+            <span class="section-number">02</span>
+            <div>
+              <h2 id="algorithm-title">Choose a scheduling algorithm</h2>
+              <p>Change the policy or its time quantum, then run the simulation.</p>
+            </div>
+          </div>
+        </div>
+        <div class="run-grid">
+          <label>Scheduling algorithm
+            <select id="algorithm">
+              <option value="fcfs">First Come, First Served (FCFS)</option>
+              <option value="sjf">Shortest Job First (non-preemptive)</option>
+              <option value="rr">Round Robin (RR)</option>
+              <option value="mlfq">Multi-Level Feedback Queue (MLFQ)</option>
+            </select>
+          </label>
+          <label class="quantum-field hidden" id="quantum-field">Time quantum
+            <input id="quantum" type="number" min="1" step="1" value="2">
+          </label>
+          <div id="algorithm-note" style="align-self:end;padding:0 0 10px;color:#758198;font-size:12px;">Non-preemptive: the selected process runs until its burst is complete.</div>
+          <button class="button" id="run-button" type="button">▶ Run schedule</button>
+        </div>
+        <p class="error-message" id="error-message" role="alert" aria-live="polite"></p>
+      </section>
+
+      <section class="card" aria-labelledby="results-title">
+        <div class="section-heading">
+          <div class="heading-copy">
+            <span class="section-number">03</span>
+            <div>
+              <h2 id="results-title">Simulation results</h2>
+              <p>Click a time slice or play the steps to see what the scheduler did.</p>
+            </div>
+          </div>
+        </div>
+        <div class="result-grid">
+          <div>
+            <div class="subpanel">
+              <h3>Gantt chart</h3>
+              <p class="hint">Each block is one uninterrupted CPU interval; the numbers below mark time boundaries.</p>
+              <div id="chart-empty" class="chart-empty">Run a schedule to draw its Gantt chart.</div>
+              <div class="chart-scroll" id="chart-scroll" hidden>
+                <div class="chart" id="chart" role="list" aria-label="Gantt chart"></div>
+                <div class="tick-row" id="ticks"></div>
+              </div>
+              <div class="legend" id="legend"></div>
+              <div class="step-controls">
+                <button class="button secondary small" id="previous-step" type="button" disabled aria-label="Previous step">←</button>
+                <button class="button secondary small" id="play-button" type="button" disabled>▶ Play steps</button>
+                <button class="button secondary small" id="next-step" type="button" disabled aria-label="Next step">→</button>
+                <span class="step-label" id="step-label">No steps</span>
+              </div>
+            </div>
+            <div class="subpanel" style="margin-top:14px;">
+              <h3>Process metrics</h3>
+              <p class="hint">Turnaround = completion − arrival · Waiting = turnaround − burst</p>
+              <div class="table-wrap" style="margin-top:0;">
+                <table class="metrics-table" aria-label="Scheduling metrics">
+                  <thead><tr><th>Process</th><th>Completion</th><th>Turnaround</th><th>Waiting</th></tr></thead>
+                  <tbody id="metrics-body"><tr><td class="empty-state" colspan="4">Metrics will appear after a run.</td></tr></tbody>
+                </table>
+              </div>
+              <div class="metrics">
+                <div class="metric"><span>Average turnaround</span><strong id="average-turnaround">—</strong></div>
+                <div class="metric"><span>Average waiting</span><strong id="average-waiting">—</strong></div>
+              </div>
+            </div>
+          </div>
+          <div class="subpanel">
+            <h3>Operation log</h3>
+            <p class="hint">Plain-English trace of arrivals, dispatches, and completions.</p>
+            <div class="log-list" id="log-list" aria-live="polite"><div class="log-empty">Run the simulation to see the scheduler's decisions.</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="lab-title">
+        <div class="section-heading">
+          <div class="heading-copy">
+            <span class="section-number">04</span>
+            <div>
+              <h2 id="lab-title">Lab procedure & reference</h2>
+              <p>Use this simulator to observe scheduling behavior and verify the calculated metrics.</p>
+            </div>
+          </div>
+        </div>
+        <div class="lab-grid">
+          <article class="lab-item">
+            <h3>Aim</h3>
+            <p>To simulate CPU scheduling policies and calculate each process's completion time, turnaround time, and waiting time from arrival and burst times.</p>
+          </article>
+          <article class="lab-item">
+            <h3>Procedure</h3>
+            <p>1. Add processes with non-negative arrival times and positive burst times.<br>2. Select a scheduling policy and set its quantum if needed.<br>3. Run the schedule; inspect the Gantt chart, operation log, and metrics.<br>4. Repeat with another policy to compare results.</p>
+          </article>
+          <article class="lab-item">
+            <h3>Pseudocode</h3>
+            <pre>while unfinished processes remain:
+    add arrived processes to the ready queue
+    if the ready queue is empty:
+        advance time to the next arrival
+    else:
+        select the next process by policy
+        run it for its allowed CPU interval
+        update remaining burst and time
+        requeue it if it is not complete
+for each process:
+    turnaround = completion - arrival
+    waiting = turnaround - burst</pre>
+          </article>
+          <article class="lab-item">
+            <h3>C code · FCFS example</h3>
+            <pre>#include &lt;stdio.h&gt;
+
+int main(void) {
+    int n, arrival[50], burst[50], completion[50];
+    scanf("%d", &amp;n);
+    for (int i = 0; i &lt; n; i++)
+        scanf("%d %d", &amp;arrival[i], &amp;burst[i]);
+
+    int time = 0;
+    for (int i = 0; i &lt; n; i++) {
+        if (time &lt; arrival[i]) time = arrival[i];
+        time += burst[i];
+        completion[i] = time;
+        int turnaround = completion[i] - arrival[i];
+        int waiting = turnaround - burst[i];
+        printf("P%d: CT=%d TAT=%d WT=%d\n",
+               i + 1, completion[i], turnaround, waiting);
+    }
+    return 0;
+}</pre>
+            <p style="margin-top:8px;font-size:11px;">This compact example assumes processes are entered in arrival-time order; the simulator sorts arrivals and supports all four policies.</p>
+          </article>
+          <article class="lab-item">
+            <h3>Sample input</h3>
+            <pre>Process   Arrival   Burst
+P1        0         5
+P2        1         3
+P3        2         1
+Policy: Round Robin, quantum = 2</pre>
+          </article>
+          <article class="lab-item">
+            <h3>Output to verify</h3>
+            <p>For the sample input under RR (q = 2): P1 completes at 9 (TAT 9, WT 4), P2 at 8 (TAT 7, WT 4), and P3 at 5 (TAT 3, WT 2). The chart and metrics update when you run it.</p>
+          </article>
+          <article class="lab-item" style="grid-column:1/-1;">
+            <h3>Frequently asked questions</h3>
+            <details>
+              <summary>What is the difference between turnaround and waiting time?</summary>
+              <p>Turnaround is total time from arrival to completion. Waiting is time spent ready but not running, calculated here as turnaround minus CPU burst.</p>
+            </details>
+            <details>
+              <summary>Why is there a gray block in my Gantt chart?</summary>
+              <p>It represents CPU idle time: no process had arrived and become ready during that interval.</p>
+            </details>
+            <details>
+              <summary>Is SJF preemptive? How does this MLFQ work?</summary>
+              <p>SJF here is non-preemptive: once selected, a process runs to completion. The simplified MLFQ uses three round-robin queues with quanta 2, 4, and 8; new arrivals enter the highest-priority queue, and a process that uses a full slice without completing moves down one level. It does not interrupt an active slice for a newly arriving process.</p>
+            </details>
+            <details>
+              <summary>Do the results persist when I close the page?</summary>
+              <p>No. Everything runs locally in this page, and the workload is kept only in the current browser tab.</p>
+            </details>
+          </article>
+        </div>
+      </section>
+    </main>
+    <footer>CPU Scheduling Lab · A self-contained, offline learning tool</footer>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var processes = [];
+      var result = null;
+      var activeStep = -1;
+      var playTimer = null;
+      var colors = ["#4263eb", "#0e9f8a", "#d68511", "#9061cf", "#d04a57", "#3182bd", "#bb6b30", "#64748b"];
+      var form = document.getElementById("process-form");
+      var processIdInput = document.getElementById("process-id");
+      var arrivalInput = document.getElementById("arrival-time");
+      var burstInput = document.getElementById("burst-time");
+      var algorithmInput = document.getElementById("algorithm");
+      var quantumInput = document.getElementById("quantum");
+      var errorMessage = document.getElementById("error-message");
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, function (char) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char];
+        });
+      }
+
+      function colorFor(index) {
+        return colors[index % colors.length];
+      }
+
+      function stopPlayback() {
+        if (playTimer !== null) {
+          window.clearInterval(playTimer);
+          playTimer = null;
+        }
+        document.getElementById("play-button").textContent = "▶ Play steps";
+      }
+
+      function invalidateResult() {
+        stopPlayback();
+        result = null;
+        activeStep = -1;
+        renderResults();
+      }
+
+      function renderProcesses() {
+        var body = document.getElementById("process-body");
+        var empty = document.getElementById("process-empty");
+        body.innerHTML = "";
+        empty.hidden = processes.length > 0;
+        processes.forEach(function (process, index) {
+          var row = document.createElement("tr");
+          row.innerHTML =
+            '<td><span class="process-chip"><span class="swatch" style="--process-color:' + colorFor(index) + '"></span>' + escapeHtml(process.id) + "</span></td>" +
+            "<td>" + process.arrival + "</td>" +
+            "<td>" + process.burst + "</td>" +
+            '<td style="text-align:right"><button class="remove-button" type="button" aria-label="Remove ' + escapeHtml(process.id) + '" data-remove="' + escapeHtml(process.id) + '">×</button></td>';
+          body.appendChild(row);
+        });
+        document.getElementById("process-count").textContent = processes.length + (processes.length === 1 ? " process" : " processes");
+      }
+
+      function addProcess(id, arrival, burst) {
+        var cleanId = id.trim();
+        if (!cleanId) {
+          errorMessage.textContent = "Enter a process ID.";
+          return false;
+        }
+        if (processes.some(function (process) { return process.id.toLowerCase() === cleanId.toLowerCase(); })) {
+          errorMessage.textContent = "Process IDs must be unique.";
+          return false;
+        }
+        if (!Number.isSafeInteger(arrival) || arrival < 0 || !Number.isSafeInteger(burst) || burst < 1) {
+          errorMessage.textContent = "Arrival must be a non-negative whole number; burst must be a positive whole number.";
+          return false;
+        }
+        processes.push({ id: cleanId, arrival: arrival, burst: burst, order: processes.length });
+        errorMessage.textContent = "";
+        renderProcesses();
+        invalidateResult();
+        return true;
+      }
+
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var arrival = Number(arrivalInput.value);
+        var burst = Number(burstInput.value);
+        if (addProcess(processIdInput.value, arrival, burst)) {
+          processIdInput.value = "";
+          burstInput.value = "";
+          processIdInput.focus();
+        }
+      });
+
+      document.getElementById("process-body").addEventListener("click", function (event) {
+        var button = event.target.closest("[data-remove]");
+        if (!button) return;
+        processes = processes.filter(function (process) { return process.id !== button.getAttribute("data-remove"); });
+        renderProcesses();
+        invalidateResult();
+      });
+
+      document.getElementById("sample-button").addEventListener("click", function () {
+        processes = [];
+        [
+          { id: "P1", arrival: 0, burst: 5 },
+          { id: "P2", arrival: 1, burst: 3 },
+          { id: "P3", arrival: 2, burst: 1 }
+        ].forEach(function (process) { processes.push(Object.assign({ order: processes.length }, process)); });
+        renderProcesses();
+        invalidateResult();
+        algorithmInput.value = "rr";
+        quantumInput.value = "2";
+        updateAlgorithmOptions();
+        errorMessage.textContent = "";
+      });
+
+      document.getElementById("clear-button").addEventListener("click", function () {
+        processes = [];
+        renderProcesses();
+        invalidateResult();
+        errorMessage.textContent = "";
+      });
+
+      function updateAlgorithmOptions() {
+        var mode = algorithmInput.value;
+        var quantumField = document.getElementById("quantum-field");
+        var note = document.getElementById("algorithm-note");
+        quantumField.classList.toggle("hidden", mode !== "rr");
+        if (mode === "fcfs") note.textContent = "Non-preemptive: the earliest-arriving ready process runs to completion.";
+        if (mode === "sjf") note.textContent = "Non-preemptive: choose the ready process with the shortest burst.";
+        if (mode === "rr") note.textContent = "Preemptive: each ready process gets up to the selected time quantum.";
+        if (mode === "mlfq") note.textContent = "Three feedback queues use round-robin quanta of 2, 4, and 8 time units.";
+      }
+      algorithmInput.addEventListener("change", updateAlgorithmOptions);
+
+      function sortedProcesses() {
+        return processes.slice().sort(function (a, b) {
+          return a.arrival - b.arrival || a.order - b.order;
+        });
+      }
+
+      function runNonPreemptive(mode) {
+        var ordered = sortedProcesses();
+        var time = 0;
+        var next = 0;
+        var ready = [];
+        var segments = [];
+        var events = [];
+        var metrics = {};
+
+        while (next < ordered.length || ready.length) {
+          while (next < ordered.length && ordered[next].arrival <= time) {
+            var arrived = ordered[next++];
+            ready.push(arrived);
+            events.push({ time: arrived.arrival, type: "arrival", processId: arrived.id, text: arrived.id + " arrives at time " + arrived.arrival + " and joins the ready queue." });
+          }
+          if (!ready.length) {
+            var nextArrival = ordered[next].arrival;
+            if (nextArrival > time) {
+              segments.push({ id: null, start: time, end: nextArrival });
+              events.push({ time: time, type: "idle", processId: null, text: "The CPU is idle from time " + time + " to " + nextArrival + " because no process is ready." });
+              time = nextArrival;
+            }
+            continue;
+          }
+          if (mode === "sjf") {
+            ready.sort(function (a, b) { return a.burst - b.burst || a.arrival - b.arrival || a.order - b.order; });
+          } else {
+            ready.sort(function (a, b) { return a.arrival - b.arrival || a.order - b.order; });
+          }
+          var current = ready.shift();
+          if (current.arrival <= time && !events.some(function (event) { return event.type === "arrival" && event.processId === current.id; })) {
+            events.push({ time: current.arrival, type: "arrival", processId: current.id, text: current.id + " arrives at time " + current.arrival + " and joins the ready queue." });
+          }
+          var start = time;
+          time += current.burst;
+          segments.push({ id: current.id, start: start, end: time });
+          metrics[current.id] = { completion: time, turnaround: time - current.arrival, waiting: time - current.arrival - current.burst };
+          events.push({ time: start, type: "dispatch", processId: current.id, text: mode === "sjf"
+            ? "At time " + start + ", the scheduler selects " + current.id + " (shortest ready burst: " + current.burst + "). It runs to time " + time + "."
+            : "At time " + start + ", the scheduler dispatches " + current.id + ". It runs to completion at time " + time + "." });
+          events.push({ time: time, type: "completion", processId: current.id, text: current.id + " completes at time " + time + "." });
+        }
+        return { segments: segments, events: events, metrics: metrics };
+      }
+
+      function runRoundRobin(quantum) {
+        var ordered = sortedProcesses();
+        var next = 0;
+        var time = 0;
+        var ready = [];
+        var remaining = {};
+        var metrics = {};
+        var segments = [];
+        var events = [];
+        ordered.forEach(function (process) { remaining[process.id] = process.burst; });
+
+        while (next < ordered.length || ready.length) {
+          while (next < ordered.length && ordered[next].arrival <= time) {
+            var arrived = ordered[next++];
+            ready.push(arrived);
+            events.push({ time: arrived.arrival, type: "arrival", processId: arrived.id, text: arrived.id + " arrives at time " + arrived.arrival + " and joins the ready queue." });
+          }
+          if (!ready.length) {
+            var idleUntil = ordered[next].arrival;
+            if (idleUntil > time) {
+              segments.push({ id: null, start: time, end: idleUntil });
+              events.push({ time: time, type: "idle", processId: null, text: "The CPU is idle from time " + time + " to " + idleUntil + " because no process is ready." });
+              time = idleUntil;
+            }
+            continue;
+          }
+          var current = ready.shift();
+          var start = time;
+          var runFor = Math.min(quantum, remaining[current.id]);
+          var end = time + runFor;
+          while (next < ordered.length && ordered[next].arrival < end) {
+            var midSliceArrival = ordered[next++];
+            ready.push(midSliceArrival);
+            events.push({ time: midSliceArrival.arrival, type: "arrival", processId: midSliceArrival.id, text: midSliceArrival.id + " arrives at time " + midSliceArrival.arrival + " and joins the end of the ready queue." });
+          }
+          segments.push({ id: current.id, start: start, end: end });
+          time = end;
+          remaining[current.id] -= runFor;
+          events.push({ time: start, type: "dispatch", processId: current.id, text: "At time " + start + ", the scheduler gives " + current.id + " a time slice of " + runFor + " (quantum " + quantum + ")." });
+          if (remaining[current.id] === 0) {
+            metrics[current.id] = { completion: time, turnaround: time - current.arrival, waiting: time - current.arrival - current.burst };
+            events.push({ time: time, type: "completion", processId: current.id, text: current.id + " completes at time " + time + "." });
+          } else {
+            ready.push(current);
+            events.push({ time: time, type: "preempt", processId: current.id, text: current.id + " has " + remaining[current.id] + " time units left and returns to the end of the ready queue." });
+          }
+        }
+        return { segments: segments, events: events, metrics: metrics };
+      }
+
+      function runMlfq() {
+        var ordered = sortedProcesses();
+        var next = 0;
+        var time = 0;
+        var queues = [[], [], []];
+        var quanta = [2, 4, 8];
+        var remaining = {};
+        var levels = {};
+        var metrics = {};
+        var segments = [];
+        var events = [];
+        ordered.forEach(function (process) {
+          remaining[process.id] = process.burst;
+          levels[process.id] = 0;
+        });
+        function addArrivals() {
+          while (next < ordered.length && ordered[next].arrival <= time) {
+            var process = ordered[next++];
+            queues[0].push(process);
+            events.push({ time: process.arrival, type: "arrival", processId: process.id, text: process.id + " arrives at time " + process.arrival + " and enters MLFQ queue 1." });
+          }
+        }
+        function hasReady() { return queues.some(function (queue) { return queue.length > 0; }); }
+
+        while (next < ordered.length || hasReady()) {
+          addArrivals();
+          if (!hasReady()) {
+            var idleUntil = ordered[next].arrival;
+            if (idleUntil > time) {
+              segments.push({ id: null, start: time, end: idleUntil });
+              events.push({ time: time, type: "idle", processId: null, text: "The CPU is idle from time " + time + " to " + idleUntil + " because no process is ready." });
+              time = idleUntil;
+            }
+            continue;
+          }
+          var level = queues.findIndex(function (queue) { return queue.length > 0; });
+          var current = queues[level].shift();
+          var start = time;
+          var runFor = Math.min(quanta[level], remaining[current.id]);
+          var end = time + runFor;
+          while (next < ordered.length && ordered[next].arrival < end) {
+            var arrived = ordered[next++];
+            queues[0].push(arrived);
+            events.push({ time: arrived.arrival, type: "arrival", processId: arrived.id, text: arrived.id + " arrives at time " + arrived.arrival + " and enters MLFQ queue 1." });
+          }
+          segments.push({ id: current.id, start: start, end: end, level: level });
+          time = end;
+          remaining[current.id] -= runFor;
+          events.push({ time: start, type: "dispatch", processId: current.id, text: "At time " + start + ", the scheduler runs " + current.id + " from MLFQ queue " + (level + 1) + " for up to " + quanta[level] + " units." });
+          if (remaining[current.id] === 0) {
+            metrics[current.id] = { completion: time, turnaround: time - current.arrival, waiting: time - current.arrival - current.burst };
+            events.push({ time: time, type: "completion", processId: current.id, text: current.id + " completes at time " + time + "." });
+          } else {
+            var nextLevel = Math.min(level + 1, 2);
+            levels[current.id] = nextLevel;
+            queues[nextLevel].push(current);
+            events.push({ time: time, type: "feedback", processId: current.id, text: current.id + " used its full slice with " + remaining[current.id] + " units left, so it moves to MLFQ queue " + (nextLevel + 1) + "." });
+          }
+        }
+        return { segments: segments, events: events, metrics: metrics };
+      }
+
+      function runSchedule() {
+        errorMessage.textContent = "";
+        if (!processes.length) {
+          errorMessage.textContent = "Add at least one process before running the schedule.";
+          return;
+        }
+        var mode = algorithmInput.value;
+        var quantum = Number(quantumInput.value);
+        if (mode === "rr" && (!Number.isSafeInteger(quantum) || quantum < 1)) {
+          errorMessage.textContent = "The Round Robin time quantum must be a positive whole number.";
+          return;
+        }
+        stopPlayback();
+        if (mode === "fcfs" || mode === "sjf") result = runNonPreemptive(mode);
+        if (mode === "rr") result = runRoundRobin(quantum);
+        if (mode === "mlfq") result = runMlfq();
+        activeStep = result.segments.length ? 0 : -1;
+        renderResults();
+      }
+      document.getElementById("run-button").addEventListener("click", runSchedule);
+
+      function renderChart() {
+        var chartEmpty = document.getElementById("chart-empty");
+        var chartScroll = document.getElementById("chart-scroll");
+        var chart = document.getElementById("chart");
+        var ticks = document.getElementById("ticks");
+        var legend = document.getElementById("legend");
+        chart.innerHTML = "";
+        ticks.innerHTML = "";
+        legend.innerHTML = "";
+        if (!result || !result.segments.length) {
+          chartEmpty.hidden = false;
+          chartScroll.hidden = true;
+          chartEmpty.textContent = "Run a schedule to draw its Gantt chart.";
+          return;
+        }
+        chartEmpty.hidden = true;
+        chartScroll.hidden = false;
+        var total = result.segments[result.segments.length - 1].end;
+        var width = Math.max(100, total * 54);
+        chart.style.width = width + "px";
+        result.segments.forEach(function (segment, index) {
+          var block = document.createElement("button");
+          block.type = "button";
+          block.className = "chart-segment" + (segment.id === null ? " idle" : "");
+          block.setAttribute("role", "listitem");
+          block.setAttribute("aria-label", (segment.id || "CPU idle") + ", time " + segment.start + " to " + segment.end);
+          block.dataset.step = index;
+          block.dataset.process = segment.id || "";
+          block.style.width = ((segment.end - segment.start) / total * width) + "px";
+          if (segment.id !== null) {
+            var processIndex = processes.findIndex(function (process) { return process.id === segment.id; });
+            block.style.backgroundColor = colorFor(processIndex < 0 ? 0 : processIndex);
+            block.textContent = segment.id + (segment.level !== undefined ? " · Q" + (segment.level + 1) : "");
+          } else {
+            block.textContent = "Idle";
+          }
+          block.addEventListener("click", function () { selectStep(Number(block.dataset.step)); });
+          chart.appendChild(block);
+        });
+        var boundaries = [result.segments[0].start];
+        result.segments.forEach(function (segment) { boundaries.push(segment.end); });
+        boundaries.forEach(function (time, index) {
+          var tick = document.createElement("span");
+          tick.className = "tick";
+          tick.textContent = time;
+          tick.style.left = (time / total * width) + "px";
+          if (index === 0) tick.style.left = "0px";
+          ticks.appendChild(tick);
+        });
+        var usedIds = [];
+        result.segments.forEach(function (segment) {
+          if (segment.id && usedIds.indexOf(segment.id) === -1) usedIds.push(segment.id);
+        });
+        usedIds.forEach(function (id) {
+          var processIndex = processes.findIndex(function (process) { return process.id === id; });
+          var item = document.createElement("span");
+          item.className = "legend-item";
+          item.innerHTML = '<span class="swatch" style="--process-color:' + colorFor(processIndex) + '"></span>' + escapeHtml(id);
+          legend.appendChild(item);
+        });
+        if (result.segments.some(function (segment) { return segment.id === null; })) {
+          var idleLegend = document.createElement("span");
+          idleLegend.className = "legend-item";
+          idleLegend.innerHTML = '<span class="swatch" style="--process-color:#c8d0dd"></span>CPU idle';
+          legend.appendChild(idleLegend);
+        }
+      }
+
+      function renderMetrics() {
+        var body = document.getElementById("metrics-body");
+        body.innerHTML = "";
+        if (!result) {
+          body.innerHTML = '<tr><td class="empty-state" colspan="4">Metrics will appear after a run.</td></tr>';
+          document.getElementById("average-turnaround").textContent = "—";
+          document.getElementById("average-waiting").textContent = "—";
+          return;
+        }
+        var sumTurnaround = 0;
+        var sumWaiting = 0;
+        sortedProcesses().forEach(function (process, index) {
+          var metric = result.metrics[process.id];
+          var row = document.createElement("tr");
+          row.dataset.process = process.id;
+          row.innerHTML =
+            '<td><span class="process-chip"><span class="swatch" style="--process-color:' + colorFor(processes.findIndex(function (item) { return item.id === process.id; })) + '"></span>' + escapeHtml(process.id) + "</span></td>" +
+            "<td>" + metric.completion + "</td><td>" + metric.turnaround + "</td><td>" + metric.waiting + "</td>";
+          body.appendChild(row);
+          sumTurnaround += metric.turnaround;
+          sumWaiting += metric.waiting;
+        });
+        document.getElementById("average-turnaround").textContent = (sumTurnaround / processes.length).toFixed(2);
+        document.getElementById("average-waiting").textContent = (sumWaiting / processes.length).toFixed(2);
+      }
+
+      function renderLog() {
+        var list = document.getElementById("log-list");
+        list.innerHTML = "";
+        if (!result) {
+          list.innerHTML = '<div class="log-empty">Run the simulation to see the scheduler\'s decisions.</div>';
+          return;
+        }
+        result.events.forEach(function (event, index) {
+          var item = document.createElement("div");
+          item.className = "log-entry";
+          item.dataset.event = index;
+          var label = event.type === "arrival" ? "IN" : event.type === "completion" ? "✓" : event.type === "idle" ? "Zz" : event.type === "feedback" ? "↓" : event.type === "preempt" ? "↻" : "▶";
+          item.innerHTML = '<span class="log-dot">' + label + '</span><div><span class="log-time">t = ' + event.time + "</span>" + escapeHtml(event.text) + "</div>";
+          list.appendChild(item);
+        });
+      }
+
+      function selectStep(step) {
+        if (!result || !result.segments.length) return;
+        activeStep = Math.max(0, Math.min(step, result.segments.length - 1));
+        var segments = document.querySelectorAll(".chart-segment");
+        segments.forEach(function (segment, index) {
+          segment.classList.toggle("active", index === activeStep);
+          segment.classList.toggle("dimmed", index !== activeStep);
+        });
+        var selected = result.segments[activeStep];
+        var matching = -1;
+        for (var i = 0; i < result.events.length; i++) {
+          if (result.events[i].type === "dispatch" && result.events[i].processId === selected.id && result.events[i].time === selected.start) {
+            matching = i;
+            break;
+          }
+          if (selected.id === null && result.events[i].type === "idle" && result.events[i].time === selected.start) {
+            matching = i;
+            break;
+          }
+        }
+        var logItems = document.querySelectorAll(".log-entry");
+        logItems.forEach(function (item, index) { item.classList.toggle("active", index === matching); });
+        if (matching >= 0) logItems[matching].scrollIntoView({ block: "nearest", behavior: "smooth" });
+        document.querySelectorAll("#metrics-body tr[data-process]").forEach(function (row) {
+          row.classList.toggle("selected-row", selected.id !== null && row.dataset.process === selected.id);
+        });
+        document.getElementById("step-label").textContent = "Step " + (activeStep + 1) + " of " + result.segments.length + " · " + selected.start + "–" + selected.end;
+        document.getElementById("previous-step").disabled = activeStep === 0;
+        document.getElementById("next-step").disabled = activeStep === result.segments.length - 1;
+        document.getElementById("play-button").disabled = false;
+      }
+
+      function renderResults() {
+        renderChart();
+        renderMetrics();
+        renderLog();
+        var hasResult = !!(result && result.segments.length);
+        document.getElementById("previous-step").disabled = !hasResult || activeStep <= 0;
+        document.getElementById("next-step").disabled = !hasResult || activeStep >= result.segments.length - 1;
+        document.getElementById("play-button").disabled = !hasResult;
+        document.getElementById("step-label").textContent = hasResult ? "Step — of " + result.segments.length : "No steps";
+        if (hasResult) selectStep(activeStep);
+        else document.getElementById("step-label").textContent = "No steps";
+      }
+
+      document.getElementById("previous-step").addEventListener("click", function () { selectStep(activeStep - 1); });
+      document.getElementById("next-step").addEventListener("click", function () { selectStep(activeStep + 1); });
+      document.getElementById("play-button").addEventListener("click", function () {
+        if (playTimer !== null) {
+          stopPlayback();
+          return;
+        }
+        if (!result || !result.segments.length) return;
+        if (activeStep >= result.segments.length - 1) selectStep(0);
+        document.getElementById("play-button").textContent = "Ⅱ Pause";
+        playTimer = window.setInterval(function () {
+          if (activeStep >= result.segments.length - 1) {
+            stopPlayback();
+            return;
+          }
+          selectStep(activeStep + 1);
+        }, 900);
+      });
+
+      updateAlgorithmOptions();
+      renderProcesses();
+      renderResults();
+    }());
+  </script>
+</body>
+</html>
